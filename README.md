@@ -4,6 +4,14 @@
 
 ---
 
+## How It Works
+ 
+![Autonomous PM Engine — Pipeline Animation](./pipeline.svg)
+ 
+> **Reading the diagram:** Coloured dots flow live through each connection showing data in motion. Blue dots carry raw documents into the ingestion layer; violet splits them into ChromaDB (dense+sparse search) and Neo4j (entity graph); amber and emerald query results converge into the Data Analyst Agent; pink and cyan carry the structured report through the PM Agent and into the Engineering Agent, where the dashed loop shows the self-critique cycle; orange fans out to the three final output files.
+ 
+---
+
 ## Architecture Overview
 
 ```
