@@ -1,0 +1,88 @@
+CUSTOMER INTERVIEW TRANSCRIPTS
+Autonomous PM Engine — Sample Data
+=====================================
+
+--- Interview #001 ---
+Participant: Maya R., Product Lead, Series B startup (~120 employees)
+Date: 2024-09-04
+Interviewer: PM Team
+
+Q: Walk me through how you currently manage your product roadmap.
+A: Honestly it's a mess. We use a combination of Notion, Jira, and a shared Google Sheet that nobody actually keeps up to date. The biggest pain is that when I go to write a PRD, I have to manually pull together customer feedback from Intercom, Slack messages our CS team forwards to me, survey exports from Typeform — it's completely fragmented. I spend probably 30 to 40 percent of my time just aggregating information before I can even start thinking about prioritisation.
+
+Q: What happens when you finally have the information together?
+A: I write the PRD by hand. Which is fine, that's my job, but the problem is the PRDs end up being based on whoever shouted loudest recently, not on any systematic look at the data. Last quarter I spent three weeks building a feature that maybe 8 percent of customers actually wanted, because one enterprise customer complained about it loudly on a call. If I had better visibility into the full picture I would have prioritised differently.
+
+Q: What does the handoff to engineering look like?
+A: The acceptance criteria are always the weak link. Engineers come back with questions like "what does 'fast' mean here?" or "how do we handle the edge case where the user has no data?" I write in plain English and they need something more precise. We lose at least one sprint per quarter to back-and-forth that should have been in the PRD.
+
+Q: If you could wave a magic wand and fix one thing?
+A: I want the system to read all the customer feedback and tell me what the most important problems are, ranked by frequency and severity. Not AI-generated fluff, actual signal. And then help me write the PRD so that it's specific enough that engineering doesn't need to come back to me with clarifying questions.
+
+--- Interview #002 ---
+Participant: James T., Senior PM, SaaS analytics company (~400 employees)
+Date: 2024-09-06
+Interviewer: PM Team
+
+Q: Describe your roadmap planning process.
+A: We do quarterly planning and it's brutal. I maintain a backlog of about 250 items. Every quarter I have to justify prioritisation to three different stakeholders: the VP of Product, the Head of Engineering, and the CTO. They all have different intuitions about what customers want. The only way I can win that argument is with data, but the data is scattered across six different systems.
+
+Q: What systems do you mean specifically?
+A: Zendesk tickets, NPS survey comments, Gong call recordings (well, transcripts), Slack in a #product-feedback channel, a Canny board that customers post to, and occasionally direct emails that end up forwarded to me. I have to manually read through all of these. We're talking hundreds of data points per quarter. There's no unified view.
+
+Q: How long does it take to write a PRD once you have the inputs?
+A: A well-written PRD takes me about two days. A rushed one takes four hours and it shows — the engineering team catches gaps during sprint planning. The two-day version has proper user stories with personas, measurable acceptance criteria, performance requirements, edge cases. The four-hour version has none of that and we pay for it later.
+
+Q: What's missing from current tooling?
+A: Entity resolution is a big one. The same customer problem gets described twenty different ways across different channels. "Search is broken" and "can't find documents" and "results are irrelevant" are all the same underlying problem, but if I'm counting mentions manually I might count them as three separate issues. I need something that groups semantically similar complaints automatically and gives me a frequency count on the unified concept, not the individual strings.
+
+Q: What would a perfect workflow look like?
+A: I upload all my feedback sources on Monday morning. By Tuesday I have a ranked list of themes, each with a count of how many customers mentioned it and representative quotes. I pick the top three themes, and the tool drafts the first version of the PRD which I then edit. The draft should be 70 to 80 percent of the way there — correct structure, grounded claims, specific acceptance criteria. I just refine it.
+
+--- Interview #003 ---
+Participant: Priya S., Head of Product, FinTech startup (~65 employees)
+Date: 2024-09-10
+Interviewer: PM Team
+
+Q: How do you currently prioritise features?
+A: I use a rough RICE framework, but honestly the scores are made up. Reach is a guess. Impact is vibes. Confidence is "I think so." The only number I trust is effort, because engineering gives me actual estimates. Everything else is fiction. I know RICE is supposed to be evidence-based but without a systematic way to measure reach and impact from customer data, it's just a prioritisation theatre.
+
+Q: Where does your customer feedback currently live?
+A: Our main sources are user interviews we do every two weeks — those are transcribed and live in Notion. We do a quarterly satisfaction survey and I export the results to a CSV. We have a small advisory board of 12 customers who send us email threads. And then there's just general Slack noise from the sales team forwarding things. The email threads from the advisory board are probably the highest signal but they're also the hardest to process systematically because they're long and unstructured.
+
+Q: What does your PRD process look like?
+A: I use a template I inherited from a previous job. I fill it in manually. The weakest part is always the "problem statement" section because I struggle to write it with enough specificity. I end up writing something like "users find onboarding difficult" which is vague and not actionable. I know from reading the interviews that the specific pain is around the third step in the flow where we ask for bank verification, but I can't easily cite that because I'd have to go back and re-read all the transcripts.
+
+Q: What do you wish existed?
+A: Automatic citation. When I write "onboarding is a pain point affecting 40 percent of new users," I want to be able to say "this claim is supported by Interview #7, Interview #12, Survey response #34, and #58." Right now I just write it and hope nobody asks for evidence. In a properly funded company that would be embarrassing. I want the tool to surface the evidence automatically so that my PRDs are defensible.
+
+--- Interview #004 ---
+Participant: Carlos M., Associate PM, HR tech company (~200 employees)
+Date: 2024-09-15
+Interviewer: PM Team
+
+Q: What's your biggest pain point as a PM?
+A: Honestly? The gap between what I write in a PRD and what actually gets built. I'll spend time writing acceptance criteria and then three weeks into the sprint an engineer asks a question that makes it clear they interpreted something completely differently. I think the issue is that I write acceptance criteria in plain English and engineers think in code. There's a translation layer that I'm not equipped to do.
+
+Q: How do you handle feedback from customers?
+A: We have a customer success team of five people. They are the primary interface with customers. They relay feedback to me in our weekly sync, and I take notes. It's a telephone game. By the time it gets to me, important context has been stripped out. I don't have direct access to the original customer words. That means my problem statements are one level of abstraction removed from reality.
+
+Q: What would make your job significantly easier?
+A: Two things. First, give me direct access to the raw customer voice — not filtered through CS. If I could search through call transcripts or survey responses and find the exact quote that supports my problem statement, my PRDs would be so much more credible. Second, help me write acceptance criteria that are actually precise. I know the format — Given/When/Then — but translating a user story into that format without missing edge cases is hard. If a tool could draft the ACs and I could review and edit, I'd be much more confident in them.
+
+--- Interview #005 ---
+Participant: Anita L., Director of Product, EdTech company (~300 employees)
+Date: 2024-09-18
+Interviewer: PM Team
+
+Q: How does roadmap planning work at your company?
+A: We have three product squads and each squad has a PM. I sit above them and need to maintain a coherent cross-squad roadmap. The challenge is that each PM has their own feedback sources and their own intuitions about priorities. When I try to synthesise across squads, I'm comparing apples and oranges. One PM counts Zendesk tickets, another counts NPS detractor comments, another counts Canny upvotes. None of these are the same unit of measurement.
+
+Q: What's the impact of that inconsistency?
+A: Bad prioritisation decisions at the cross-squad level. Last year we built three features in parallel that were all solving variations of the same underlying problem — search and discoverability. If we'd seen that they were all the same theme, we could have built one great solution instead of three mediocre ones. We only realised this in a post-mortem six months later.
+
+Q: What's missing from your current tooling?
+A: Cross-source theme detection. I want to push all the feedback from all three squads into one system and have it cluster the themes automatically, deduplicated across sources. And then I want to rank those themes by total signal — not just count of mentions but some measure of severity and breadth. Which problems are affecting the most people, the most often, with the most frustration? That's what drives prioritisation.
+
+Q: How do you feel about AI-assisted PRD writing specifically?
+A: Cautiously optimistic. The risk is that AI-generated PRDs are fluffy and generic. The value is if the AI is forced to ground every claim in actual customer data. If it can write "three of five interviewed customers mentioned the search latency as a blocking issue, specifically during peak hours" and cite the sources, that's genuinely useful. If it just writes "customers want fast search," that's noise.
