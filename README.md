@@ -137,6 +137,7 @@ This project is strongest evidence for roles at the intersection of AI engineeri
 ## Known Limitations
 
 - This is a prototype, not a hardened production service.
+- The public repo still needs a final import-path normalization pass before the CLI/API run path should be treated as fully verified.
 - Authentication, authorization, background job persistence, and deployment configuration are not production-ready.
 - LLM output quality depends on prompt design, source quality, and model choice.
 - Vector and graph storage should be replaced with managed services for high-volume production workloads.
@@ -144,6 +145,7 @@ This project is strongest evidence for roles at the intersection of AI engineeri
 
 ## Next Improvements
 
+- Normalize imports or move the project into a clean `src/` package.
 - Add CI to run tests automatically.
 - Add a small browser demo or Streamlit interface.
 - Add LangSmith/OpenTelemetry tracing.
