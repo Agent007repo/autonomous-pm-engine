@@ -1,0 +1,7 @@
+Customer interviews sample
+
+Interview 001: A PM spends 30-40 percent of planning time aggregating customer feedback before writing a PRD. The biggest issue is fragmented feedback across support tools, surveys, Slack, and email.
+
+Interview 002: A senior PM needs ranked themes, representative quotes, and clearer acceptance criteria so engineering can start work without clarification cycles.
+
+Interview 003: A product leader wants evidence-backed prioritization, automatic citations, and less manual synthesis before roadmap planning.
