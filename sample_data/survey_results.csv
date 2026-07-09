@@ -1,0 +1,4 @@
+respondent_id,role,primary_pain_point,feature_requests,open_feedback
+R001,Product Manager,Manual feedback aggregation,Automated feedback aggregation; AI-assisted PRD drafting,"I copy-paste feedback from multiple tools every week."
+R002,Senior PM,Lack of evidence for prioritization,RICE scoring from real data; theme clustering,"Stakeholders challenge prioritization and I need hard numbers."
+R003,Head of Product,Vague acceptance criteria,Gherkin AC generator; technical feasibility checker,"Engineering comes back with too many clarification questions."
