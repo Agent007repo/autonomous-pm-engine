@@ -1,6 +1,20 @@
 # Autonomous Product Management Engine
 
-> A production-grade, multi-agent system that ingests unstructured customer feedback, surfaces quantitative trends, and automatically generates structured Product Requirement Documents (PRDs) and engineering roadmaps.
+> An independent multi-agent prototype that ingests customer feedback, retrieves relevant context, and generates draft Product Requirement Documents (PRDs) and engineering roadmaps for human review.
+
+## Project scope
+
+**Status:** working prototype, with source code and test modules in this repository. It is not presented as a deployed production service.
+
+**Problem:** customer feedback is scattered across documents, making it difficult to turn recurring issues into a reviewable product brief.
+
+**Workflow:** ingest feedback → retrieve context → draft requirements and priorities → run engineering critique → review the artifacts before use.
+
+**Evidence to inspect:** `api.py`, the implementation under `src/`, the test modules, and the sample-output instructions below. Generated priorities and requirements require human validation against the underlying feedback.
+
+**Production work still required:** the current API stores job state in an in-memory dictionary. A production deployment needs persistent job storage, authentication and authorization, upload controls, retention rules, monitoring, and deployment validation. These are requirements to complete, not claimed capabilities.
+
+**Evaluation boundary:** repository test modules demonstrate what can be checked; their presence alone is not a verified passing test run or a measured user outcome. Retrieval quality, source support, and usefulness of generated artifacts need a documented benchmark before operational claims are made.
 
 ---
 
