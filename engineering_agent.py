@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import json
 import re
+import math
 
 from crewai import Agent, Task, Crew, Process
 from langchain_openai import ChatOpenAI
@@ -57,7 +58,7 @@ def run_engineering_agent(
     """
     cfg = get_settings()
     max_rounds = max_rounds or cfg.max_critique_rounds
-    gate_threshold = gate_threshold or cfg.engineering_gate_threshold
+    gate_threshold = cfg.engineering_gate_threshold if gate_threshold is None else gate_threshold
 
     llm = ChatOpenAI(
         api_key=cfg.openai_api_key,
@@ -143,7 +144,9 @@ Return ONLY a JSON object with this exact schema:
             }
 
         score = float(data.get("score", 0.0))
-        passed = bool(data.get("passed", score >= gate_threshold))
+        if not math.isfinite(score) or not 0 <= score <= 10:
+            raise ValueError("Engineering score must be finite and within 0..10.")
+        passed = score >= gate_threshold  # Compute gate locally, never trust model booleans.
         feedback = str(data.get("feedback", ""))
         tech_assessment = str(data.get("technical_assessment", ""))
 
@@ -173,6 +176,7 @@ Return ONLY a JSON object with this exact schema:
                 f"Final score: {score:.1f}. Proceeding with best available draft."
             )
 
+    current_prd["status"] = "Draft" if critique_history[-1]["passed"] else "Needs Review"
     return current_prd, critique_history
 
 
@@ -195,3 +199,4 @@ def _prd_to_text(prd: PRDDraft) -> str:
     for heading, content in sections:
         lines.append(f"## {heading}\n{content}\n")
     return "\n".join(lines)
+

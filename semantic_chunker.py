@@ -61,14 +61,18 @@ class SemanticChunker:
         model: SentenceTransformer | None = None,
         threshold: float | None = None,
         chunk_size: int | None = None,
-        chunk_overlap_sentences: int = 1,
+        chunk_overlap_sentences: int = 0,
         window_size: int = 3,
     ) -> None:
         cfg = get_settings()
-        self.threshold = threshold or cfg.semantic_split_threshold
-        self.max_chunk_tokens = chunk_size or cfg.chunk_size
+        self.threshold = cfg.semantic_split_threshold if threshold is None else threshold
+        self.max_chunk_tokens = cfg.chunk_size if chunk_size is None else chunk_size
         self.overlap_sentences = chunk_overlap_sentences
         self.window_size = window_size
+        if not 0 <= self.threshold <= 1 or self.max_chunk_tokens < 2 or window_size < 1:
+            raise ValueError("Invalid chunking parameters.")
+        if chunk_overlap_sentences != 0:
+            raise ValueError("Sentence overlap is not implemented; set chunk_overlap_sentences=0.")
 
         logger.info(f"Loading embedding model: {cfg.embedding_model}")
         self._model = model or SentenceTransformer(
@@ -103,7 +107,7 @@ class SemanticChunker:
             return []
 
         sentences = self._sentence_tokenize(text)
-        if len(sentences) <= self.window_size:
+        if len(sentences) <= self.window_size and sum(len(s.split()) for s in sentences) * 1.3 <= self.max_chunk_tokens:
             # Document too short to split meaningfully
             return [self._make_chunk(doc, sentences, 0, len(sentences) - 1, 0)]
 
@@ -113,18 +117,18 @@ class SemanticChunker:
         merged_chunks = self._enforce_size_constraints(raw_chunks)
 
         result: list[Document] = []
-        sent_cursor = 0
+        sentence_word_ends = np.cumsum([len(s.split()) for s in sentences])
+        word_cursor = 0
         for i, chunk_sentences in enumerate(merged_chunks):
             chunk_doc = self._make_chunk(
                 doc,
                 chunk_sentences,
-                sent_cursor,
-                sent_cursor + len(chunk_sentences) - 1,
+                int(np.searchsorted(sentence_word_ends, word_cursor, side="right")),
+                int(np.searchsorted(sentence_word_ends, word_cursor + sum(len(s.split()) for s in chunk_sentences) - 1, side="right")),
                 i,
             )
             result.append(chunk_doc)
-            # Overlap: next chunk starts `overlap_sentences` before this one ended
-            sent_cursor += max(1, len(chunk_sentences) - self.overlap_sentences)
+            word_cursor += sum(len(s.split()) for s in chunk_sentences)
 
         return result
 
@@ -165,7 +169,8 @@ class SemanticChunker:
             right_centroid = embeddings[i + 1 : i + 1 + w].mean(axis=0)
 
             # Cosine similarity (embeddings are already L2-normalised)
-            sim = float(np.dot(left_centroid, right_centroid))
+            denominator = np.linalg.norm(left_centroid) * np.linalg.norm(right_centroid)
+            sim = float(np.dot(left_centroid, right_centroid) / denominator) if denominator > 0 else 0.0
 
             if sim < self.threshold:
                 boundaries.append(i)
@@ -224,8 +229,12 @@ class SemanticChunker:
     def _bisect_chunk(self, sentences: list[str]) -> list[list[str]]:
         TOKEN_WORD_RATIO = 1.3
         word_count = sum(len(s.split()) for s in sentences)
-        if word_count * TOKEN_WORD_RATIO <= self.max_chunk_tokens or len(sentences) <= 1:
+        if word_count * TOKEN_WORD_RATIO <= self.max_chunk_tokens:
             return [sentences]
+        if len(sentences) == 1:
+            words = sentences[0].split()
+            limit = max(1, int(self.max_chunk_tokens / TOKEN_WORD_RATIO))
+            return [[" ".join(words[i:i + limit])] for i in range(0, len(words), limit)]
         mid = len(sentences) // 2
         left = self._bisect_chunk(sentences[:mid])
         right = self._bisect_chunk(sentences[mid:])
@@ -248,3 +257,4 @@ class SemanticChunker:
             "chunk_char_len": len(text),
         }
         return Document(page_content=text, metadata=metadata)
+

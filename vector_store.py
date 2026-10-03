@@ -12,6 +12,10 @@ ChromaDB wrapper that supports:
 from __future__ import annotations
 
 import hashlib
+import json
+import math
+import re
+from collections import Counter
 from typing import Any
 
 import chromadb
@@ -80,6 +84,7 @@ class VectorStore:
         if not documents:
             return 0
 
+        documents = list({self._doc_id(doc): doc for doc in documents}.values())
         ids = [self._doc_id(doc) for doc in documents]
         texts = [doc.page_content for doc in documents]
         metadatas = [self._sanitise_metadata(doc.metadata) for doc in documents]
@@ -124,7 +129,11 @@ class VectorStore:
         Pure dense search using cosine similarity.
         `where` is a ChromaDB metadata filter dict, e.g. {"doc_type": "survey"}.
         """
-        k = k or self._cfg.top_k_retrieval
+        k = self._cfg.top_k_retrieval if k is None else k
+        if k < 1:
+            raise ValueError("k must be positive.")
+        if self._collection.count() == 0:
+            return []
         query_embedding = self._embedder.encode(
             [query], normalize_embeddings=True
         ).tolist()
@@ -148,14 +157,32 @@ class VectorStore:
         Sparse keyword search using ChromaDB's built-in full-text matching.
         Note: ChromaDB uses a simple substring/contains match under the hood.
         """
-        k = k or self._cfg.top_k_retrieval
-        results = self._collection.query(
-            query_texts=[query],
-            n_results=min(k, max(1, self._collection.count())),
-            where=where,
-            include=["documents", "metadatas", "distances"],
-        )
-        return self._results_to_documents(results)
+        k = self._cfg.top_k_retrieval if k is None else k
+        if k < 1:
+            raise ValueError("k must be positive.")
+        # Fetch stored text without invoking Chroma's unrelated default embedder.
+        results = self._collection.get(where=where, include=["documents", "metadatas"])
+        texts = results.get("documents") or []
+        metas = results.get("metadatas") or [{} for _ in texts]
+        tokens = [Counter(re.findall(r"\w+", text.lower())) for text in texts]
+        query_terms = set(re.findall(r"\w+", query.lower()))
+        if not texts or not query_terms:
+            return []
+        lengths = [sum(t.values()) for t in tokens]
+        average_length = sum(lengths) / len(lengths) or 1.0
+        frequencies = {term: sum(term in t for t in tokens) for term in query_terms}
+        scored = []
+        for text, meta, terms, length in zip(texts, metas, tokens, lengths):
+            score = 0.0
+            for term in query_terms:
+                tf = terms[term]
+                if tf:
+                    idf = math.log(1 + (len(texts) - frequencies[term] + .5) / (frequencies[term] + .5))
+                    score += idf * tf * 2.5 / (tf + 1.5 * (.25 + .75 * length / average_length))
+            if score > 0:
+                scored.append((score, Document(page_content=text, metadata=meta or {})))
+        scored.sort(key=lambda item: (-item[0], self._doc_id(item[1])))
+        return [doc for _, doc in scored[:k]]
 
     def hybrid_search(
         self,
@@ -172,12 +199,14 @@ class VectorStore:
         alpha = 1.0 -> pure dense
         alpha = 0.0 -> pure sparse
         """
-        k = k or self._cfg.top_k_retrieval
+        k = self._cfg.top_k_retrieval if k is None else k
         alpha = alpha if alpha is not None else self._cfg.hybrid_alpha
+        if k < 1 or not 0 <= alpha <= 1:
+            raise ValueError("k must be positive and alpha must be in 0..1.")
         fetch_k = min(k * 3, 50)  # Over-fetch so fusion has enough candidates
 
-        dense_docs = self.similarity_search(query, k=fetch_k, where=where)
-        sparse_docs = self.keyword_search(query, k=fetch_k, where=where)
+        dense_docs = self.similarity_search(query, k=fetch_k, where=where) if alpha > 0 else []
+        sparse_docs = self.keyword_search(query, k=fetch_k, where=where) if alpha < 1 else []
 
         # Build score maps keyed by document content hash
         dense_scores: dict[str, tuple[float, Document]] = {}
@@ -195,7 +224,7 @@ class VectorStore:
         all_ids = set(dense_scores) | set(sparse_scores)
         fused: list[tuple[float, Document]] = []
 
-        for doc_id in all_ids:
+        for doc_id in sorted(all_ids):
             d_score = dense_scores[doc_id][0] if doc_id in dense_scores else 0.0
             s_score = sparse_scores[doc_id][0] if doc_id in sparse_scores else 0.0
             combined = alpha * d_score + (1.0 - alpha) * s_score
@@ -213,7 +242,9 @@ class VectorStore:
 
     @staticmethod
     def _doc_id(doc: Document) -> str:
-        content = doc.page_content.encode("utf-8")
+        content = json.dumps([doc.page_content, doc.metadata.get("source", ""),
+                              doc.metadata.get("doc_type", ""), doc.metadata.get("chunk_index", 0)],
+                             ensure_ascii=False).encode("utf-8")
         return hashlib.sha256(content).hexdigest()[:16]
 
     @staticmethod
@@ -248,3 +279,4 @@ class VectorStore:
                     )
                     docs.append(doc)
         return docs
+

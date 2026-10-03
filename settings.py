@@ -48,7 +48,7 @@ class Settings(BaseSettings):
 
     # ── Chunking ──────────────────────────────────────────────────────────────
     chunk_size: int = Field(512, ge=64, le=4096)
-    chunk_overlap: int = Field(64, ge=0, le=512)
+    chunk_overlap: int = Field(0, ge=0, le=0)  # Overlap is not implemented.
     semantic_split_threshold: float = Field(0.65, ge=0.0, le=1.0)
 
     # ── Retrieval ─────────────────────────────────────────────────────────────
@@ -67,6 +67,9 @@ class Settings(BaseSettings):
 
     # ── Output ────────────────────────────────────────────────────────────────
     output_dir: str = Field("outputs/")
+    max_upload_files: int = Field(20, ge=1, le=100)
+    max_upload_bytes: int = Field(10 * 1024 * 1024, ge=1)
+    max_upload_total_bytes: int = Field(50 * 1024 * 1024, ge=1)
     prd_version: str = Field("1.0")
 
     # ── Logging ───────────────────────────────────────────────────────────────
@@ -92,3 +95,4 @@ def get_settings() -> Settings:
     Call get_settings() anywhere in the codebase; no need to re-instantiate.
     """
     return Settings()
+

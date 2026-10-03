@@ -203,7 +203,7 @@ autonomous-pm-engine/
 │   │   ├── nodes.py               # Individual graph node functions
 │   │   └── workflow.py            # StateGraph assembly + compilation
 │   ├── tools/
-│   │   ├── search_tools.py        # LangChain tools (vector + graph)
+│   │   ├── search_tools.py        # CrewAI-compatible tools (vector + graph)
 │   │   └── output_tools.py        # PRD section writing tools
 │   └── output/
 │       ├── prd_generator.py       # PRD assembly logic
@@ -227,7 +227,7 @@ autonomous-pm-engine/
 
 ## Configuration Reference
 
-All configuration lives in `.env`. See `.env.example` for the full list.
+Configuration comes from Pydantic settings and `.env`. See `.env.example`. Root Python modules contain the implementation; `src/` modules are compatibility re-exports.
 
 | Variable | Default | Description |
 |---|---|---|
@@ -240,8 +240,8 @@ All configuration lives in `.env`. See `.env.example` for the full list.
 | `CHROMA_PORT` | `8001` | ChromaDB HTTP port |
 | `CHROMA_COLLECTION` | `pm_engine` | Collection name |
 | `EMBEDDING_MODEL` | `BAAI/bge-m3` | sentence-transformers model |
-| `CHUNK_SIZE` | `512` | Max tokens per semantic chunk |
-| `CHUNK_OVERLAP` | `64` | Token overlap between chunks |
+| `CHUNK_SIZE` | `512` | Approximate token budget (word-count proxy) |
+| `CHUNK_OVERLAP` | `0` | Reserved; nonzero overlap is rejected |
 | `TOP_K_RETRIEVAL` | `10` | Chunks retrieved per query |
 | `MAX_CRITIQUE_ROUNDS` | `3` | Engineering self-critique iterations |
 | `LOG_LEVEL` | `INFO` | Loguru log level |
@@ -263,7 +263,7 @@ All configuration lives in `.env`. See `.env.example` for the full list.
 ### Engineering Agent (ReAct + Self-Critique)
 - Reads the drafted PRD
 - Identifies technical feasibility risks, missing NFRs, and under-specified acceptance criteria
-- Runs up to `MAX_CRITIQUE_ROUNDS` self-critique loops until a quality gate passes
+- Reviews the same draft up to `MAX_CRITIQUE_ROUNDS`; it does not automatically revise the PRD
 - Appends a "Technical Feasibility Assessment" section to the final PRD
 
 ---
@@ -309,3 +309,20 @@ See `docs/extending.md` for instructions on adding new:
 ## License
 
 MIT
+
+
+## Review and validation status
+
+The workflow declares its transient document/chunk state channels and binds dependencies per compiled graph. Separate runs get separate Chroma collections and Neo4j namespaces. Sparse retrieval uses BM25 over stored text; it does not invoke Chroma's default embedding model. Chunking and retrieval share the loaded embedding model. Document identities retain source provenance.
+
+Uploads accept PDF, DOCX, CSV, TXT, and Markdown basenames, reject traversal and duplicate names, and enforce limits while streaming. Defaults are 20 files, 10 MiB per file, and 50 MiB total (`MAX_UPLOAD_FILES`, `MAX_UPLOAD_BYTES`, `MAX_UPLOAD_TOTAL_BYTES`). Each job gets isolated input/output directories and downloads stay inside its output directory. Docker service ports bind to localhost. Failed ingestion prevents output, and an incomplete CLI run exits unsuccessfully.
+
+These controls are not authentication. The API stores jobs in memory and has no ownership authorization, durable queue, global resource quota, or retention cleanup. Do not expose it to untrusted users. Source documents go to the configured OpenAI service for reasoning; local embeddings and stores do not make this a sovereign or fully local system. Prompts treat source text as untrusted, but prompt injection protection is not proven.
+
+```bash
+python -m unittest discover -s tests -p test_regressions.py -v
+```
+
+The focused regression suite uses actual method definitions with boundary doubles. It checks prompt formatting, source identities, BM25 behavior, retrieval endpoints, chunk constraints, uploads, and state channels. The full pinned dependency installation, original integration suite, real Neo4j/Chroma services, OpenAI calls, and concurrent jobs have not been reproduced during this review. A passing focused suite does not establish an end-to-end working deployment. Full `pytest tests/ -v` remains a required integration check in a configured environment.
+
+Semantic chunk lengths use a word-count token estimate. Oversized sentences are split into fragments with original sentence-span metadata; overlap is disabled. The engineering gate is computed locally from validated numeric scores, and failed gates produce `Needs Review`. It is an automated review of a draft, not approval for product delivery. No sustainable-inference or energy benchmark has been measured.

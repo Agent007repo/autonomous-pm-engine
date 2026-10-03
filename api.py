@@ -16,6 +16,8 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+import shutil
+from upload_safety import safe_upload_name, bounded_upload
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -75,6 +77,7 @@ async def _run_pipeline_job(
             None,
             lambda: run_pipeline(
                 input_dir=input_dir,
+                output_dir=str(Path(input_dir).parent / "output"),
                 product_name=product_name,
                 product_context=product_context,
             ),
@@ -133,21 +136,35 @@ async def analyze(
     Returns a job_id you can use to poll /status/{job_id}.
     """
     cfg = get_settings()
-    job_id = str(uuid.uuid4())[:8]
+    job_id = str(uuid.uuid4())
 
     # Save uploaded files to a temporary job-specific directory
     job_input_dir = Path(cfg.output_dir) / "jobs" / job_id / "input"
     job_input_dir.mkdir(parents=True, exist_ok=True)
 
-    saved_files: list[str] = []
-    for upload in files:
-        dest = job_input_dir / (upload.filename or f"file_{len(saved_files)}")
-        dest.write_bytes(await upload.read())
-        saved_files.append(str(dest))
-        logger.info(f"Saved upload: {dest}")
-
-    if not saved_files:
-        raise HTTPException(status_code=400, detail="No files were uploaded.")
+    saved_files = []
+    try:
+        if not 1 <= len(files) <= cfg.max_upload_files:
+            raise ValueError('Invalid number of uploaded files.')
+        names = [safe_upload_name(upload.filename) for upload in files]
+        if len({name.casefold() for name in names}) != len(names):
+            raise ValueError('Duplicate filenames are not allowed.')
+        total = 0
+        for upload, name in zip(files, names):
+            destination = job_input_dir / name
+            total += await bounded_upload(upload, destination, cfg.max_upload_bytes)
+            if total > cfg.max_upload_total_bytes:
+                raise ValueError('Combined documents exceed upload size limit.')
+            saved_files.append(str(destination))
+    except ValueError as exc:
+        shutil.rmtree(job_input_dir.parent, ignore_errors=True)
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception:
+        shutil.rmtree(job_input_dir.parent, ignore_errors=True)
+        raise
+    finally:
+        for upload in files:
+            await upload.close()
 
     _jobs[job_id] = {
         "job_id": job_id,
@@ -203,7 +220,10 @@ async def download_output(job_id: str, doc_type: str) -> FileResponse:
         raise HTTPException(status_code=400, detail=f"Unknown doc_type: {doc_type}")
 
     file_path = job.get(path_key)
-    if not file_path or not Path(file_path).exists():
+    output_root = (Path(get_settings().output_dir) / "jobs" / job_id / "output").resolve()
+    if file_path and not Path(file_path).resolve().is_relative_to(output_root):
+        raise HTTPException(status_code=403, detail="Output path is outside this job.")
+    if not file_path or not Path(file_path).is_file():
         raise HTTPException(
             status_code=404,
             detail=f"Output '{doc_type}' not yet available for job '{job_id}'.",
@@ -220,3 +240,4 @@ async def download_output(job_id: str, doc_type: str) -> FileResponse:
 async def list_jobs() -> list[dict[str, Any]]:
     """List all pipeline jobs and their statuses."""
     return list(_jobs.values())
+

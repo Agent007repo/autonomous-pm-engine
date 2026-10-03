@@ -76,7 +76,7 @@ class DocumentLoader:
                 all_docs.extend(docs)
                 logger.info(f"Loaded {len(docs)} document(s) from {fp.name}")
             except Exception as exc:
-                logger.warning(f"Failed to load {fp}: {exc}")
+                raise ValueError(f"Failed to load document {fp.name}") from exc
 
         logger.info(f"Total documents loaded: {len(all_docs)}")
         return all_docs
@@ -113,7 +113,7 @@ class DocumentLoader:
     # ── Format-specific loaders ───────────────────────────────────────────────
 
     def _load_txt(self, fp: Path) -> list[Document]:
-        text = fp.read_text(encoding="utf-8", errors="replace")
+        text = fp.read_text(encoding="utf-8")
         return [Document(page_content=text, metadata={"source": str(fp), "page": 0})]
 
     def _load_pdf(self, fp: Path) -> list[Document]:
@@ -142,7 +142,7 @@ class DocumentLoader:
         This preserves granularity for survey data (one row = one respondent).
         """
         docs: list[Document] = []
-        with fp.open(encoding="utf-8", errors="replace", newline="") as fh:
+        with fp.open(encoding="utf-8", newline="") as fh:
             reader = csv.DictReader(fh)
             if reader.fieldnames is None:
                 return []
@@ -168,3 +168,4 @@ class DocumentLoader:
             if keyword in stem_lower:
                 return doc_type
         return "unknown"
+

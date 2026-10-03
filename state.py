@@ -57,6 +57,11 @@ class PipelineState(TypedDict):
     product_name: str
     product_context: str            # Brief description of the product domain
 
+    # Transient channels must be declared or LangGraph discards them.
+    _raw_documents: list[Any]
+    _chunks: list[Any]
+    output_dir: str
+
     # ── Ingestion state ───────────────────────────────────────────────────────
     raw_document_count: int
     chunk_count: int
@@ -78,3 +83,4 @@ class PipelineState(TypedDict):
 
     # ── Errors (non-fatal, collected for reporting) ───────────────────────────
     errors: list[str]
+
