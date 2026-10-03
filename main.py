@@ -175,6 +175,10 @@ def main() -> None:
         for err in final_state["errors"]:
             console.print(f"  [yellow]-[/yellow] {err}")
 
+    if not final_state.get("completed") or final_state.get("errors"):
+        sys.exit(1)
+
 
 if __name__ == "__main__":
     main()
+

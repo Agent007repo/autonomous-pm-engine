@@ -13,6 +13,8 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+import re
+import uuid
 
 from loguru import logger
 
@@ -28,9 +30,9 @@ from src.output.templates import (
 class PRDGenerator:
     """Assembles and writes all pipeline output documents."""
 
-    def __init__(self) -> None:
+    def __init__(self, output_dir: str | None = None) -> None:
         self._cfg = get_settings()
-        self._output_dir = Path(self._cfg.output_dir)
+        self._output_dir = Path(output_dir or self._cfg.output_dir)
         self._output_dir.mkdir(parents=True, exist_ok=True)
 
     def generate_all(
@@ -44,8 +46,8 @@ class PRDGenerator:
         Generate all three output documents.
         Returns a dict of {doc_type: file_path}.
         """
-        ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-        slug = product_name.lower().replace(" ", "_")[:30]
+        ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f") + "_" + uuid.uuid4().hex[:8]
+        slug = re.sub(r"[^a-z0-9_-]+", "_", product_name.lower()).strip("_")[:30] or "product"
 
         prd_path = self._write_prd(prd_draft, analysis_report, critique_history, ts, slug)
         roadmap_path = self._write_roadmap(prd_draft, analysis_report, ts, slug)
@@ -197,3 +199,4 @@ def _format_feature_list(features: list[dict[str, Any]]) -> str:
         f"- **{f.get('feature_name', 'Unknown')}** ({f.get('category', '-')})"
         for f in features
     )
+

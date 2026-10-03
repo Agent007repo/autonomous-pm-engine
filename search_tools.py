@@ -16,8 +16,23 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING
 
-from langchain.tools import StructuredTool
 from pydantic import BaseModel, Field
+from crewai_tools import BaseTool
+from typing import Any, Callable
+
+
+class BoundTool(BaseTool):
+    func: Callable[..., Any] = Field(exclude=True)
+
+    def _run(self, **kwargs) -> str:
+        return self.func(**kwargs)
+
+    @classmethod
+    def from_function(cls, **kwargs):
+        return cls(**kwargs)
+
+
+StructuredTool = BoundTool
 
 if TYPE_CHECKING:
     from src.knowledge.vector_store import VectorStore
@@ -156,3 +171,4 @@ def build_search_tools(
         theme_summary_tool,
         co_occurrence_tool,
     ]
+

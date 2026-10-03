@@ -18,6 +18,8 @@ Graph topology:
 from __future__ import annotations
 
 from typing import Any
+from functools import partial
+import uuid
 
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph import END, START, StateGraph
@@ -57,21 +59,21 @@ def build_pipeline(
     cfg = get_settings()
 
     # Lazy-init singletons
-    vs = vector_store or VectorStore()
+    vs = vector_store if vector_store is not None else VectorStore(collection_name=f"{cfg.chroma_collection}_{uuid.uuid4().hex}")
     gs = graph_store or GraphStore()
-    sc = chunker or SemanticChunker()
+    sc = chunker if chunker is not None else SemanticChunker(model=vs._embedder)
 
     # Inject into nodes module (avoids passing them through state)
-    set_dependencies(vector_store=vs, graph_store=gs, chunker=sc)
+    # Dependencies are bound below, so simultaneous graphs cannot overwrite one another.
 
     # ── Graph definition ─────────────────────────────────────────────────────
     builder = StateGraph(PipelineState)
 
     builder.add_node("ingest", ingest_node)
-    builder.add_node("embed", embed_node)
-    builder.add_node("extract_entities", extract_entities_node)
-    builder.add_node("analyze", analyze_node)
-    builder.add_node("draft_prd", draft_prd_node)
+    builder.add_node("embed", partial(embed_node, vector_store=vs, chunker=sc))
+    builder.add_node("extract_entities", partial(extract_entities_node, graph_store=gs))
+    builder.add_node("analyze", partial(analyze_node, vector_store=vs, graph_store=gs))
+    builder.add_node("draft_prd", partial(draft_prd_node, vector_store=vs, graph_store=gs))
     builder.add_node("review_prd", review_prd_node)
     builder.add_node("output", output_node)
 
@@ -106,6 +108,7 @@ def run_pipeline(
     vector_store: VectorStore | None = None,
     graph_store: GraphStore | None = None,
     chunker: SemanticChunker | None = None,
+    output_dir: str | None = None,
 ) -> PipelineState:
     """
     High-level entry point: build and run the full pipeline.
@@ -130,6 +133,9 @@ def run_pipeline(
 
     initial_state: PipelineState = {
         "input_dir": input_dir,
+        "output_dir": output_dir or cfg.output_dir,
+        "_raw_documents": [],
+        "_chunks": [],
         "product_name": product_name,
         "product_context": product_context,
         "raw_document_count": 0,
@@ -163,3 +169,4 @@ def run_pipeline(
         logger.error("Pipeline did not reach completion.")
 
     return final_state
+

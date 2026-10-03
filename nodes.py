@@ -32,7 +32,7 @@ from src.tools.search_tools import build_search_tools
 
 
 # ── Dependency singletons (injected at workflow-build time) ──────────────────
-# These are set by workflow.py before the graph is compiled.
+# Legacy direct-node injection only; compiled graphs bind their own dependencies.
 _vector_store: VectorStore | None = None
 _graph_store: GraphStore | None = None
 _chunker: SemanticChunker | None = None
@@ -57,9 +57,11 @@ def ingest_node(state: PipelineState) -> dict[str, Any]:
     loader = DocumentLoader()
     try:
         documents = loader.load_directory(state["input_dir"])
+        if not documents:
+            raise ValueError("No readable documents in the input directory.")
         return {
             "raw_document_count": len(documents),
-            "_raw_documents": documents,  # Transient: not in TypedDict but carried in state
+            "_raw_documents": documents,  # Declared transient state channel
         }
     except Exception as e:
         return {"errors": state.get("errors", []) + [f"ingest_node: {e}"]}
@@ -67,51 +69,62 @@ def ingest_node(state: PipelineState) -> dict[str, Any]:
 
 # ── Node 2: Embed ─────────────────────────────────────────────────────────────
 
-def embed_node(state: PipelineState) -> dict[str, Any]:
+def embed_node(state: PipelineState, *, vector_store=None, chunker=None) -> dict[str, Any]:
     """Semantically chunk documents and upsert into ChromaDB."""
+    vector_store = vector_store if vector_store is not None else _vector_store
+    chunker = chunker if chunker is not None else _chunker
+    if state.get("errors"):
+        return {}
     logger.info("[NODE] embed_node")
     documents = state.get("_raw_documents", [])
     if not documents:
         return {"errors": state.get("errors", []) + ["embed_node: no documents to embed"]}
 
-    assert _chunker is not None, "SemanticChunker not initialised"
-    assert _vector_store is not None, "VectorStore not initialised"
+    assert chunker is not None, "SemanticChunker not initialised"
+    assert vector_store is not None, "VectorStore not initialised"
 
-    chunks = _chunker.chunk_documents(documents)
-    upserted = _vector_store.upsert_documents(chunks)
+    chunks = chunker.chunk_documents(documents)
+    upserted = vector_store.upsert_documents(chunks)
 
     return {"chunk_count": upserted, "_chunks": chunks}
 
 
 # ── Node 3: Extract entities ──────────────────────────────────────────────────
 
-def extract_entities_node(state: PipelineState) -> dict[str, Any]:
+def extract_entities_node(state: PipelineState, *, graph_store=None) -> dict[str, Any]:
     """Run LLM-based entity extraction and populate Neo4j graph."""
+    graph_store = graph_store if graph_store is not None else _graph_store
+    if state.get("errors"):
+        return {}
     logger.info("[NODE] extract_entities_node")
     chunks = state.get("_chunks", [])
     if not chunks:
         return {"errors": state.get("errors", []) + ["extract_entities_node: no chunks"]}
 
-    assert _graph_store is not None, "GraphStore not initialised"
+    assert graph_store is not None, "GraphStore not initialised"
 
     # Only extract from a subset to control LLM cost:
     # take top 50 chunks ordered by length (longer = more signal)
     subset = sorted(chunks, key=lambda d: len(d.page_content), reverse=True)[:50]
-    count = _graph_store.extract_and_store(subset)
+    count = graph_store.extract_and_store(subset)
 
     return {"pain_point_count": count}
 
 
 # ── Node 4: Analyze ───────────────────────────────────────────────────────────
 
-def analyze_node(state: PipelineState) -> dict[str, Any]:
+def analyze_node(state: PipelineState, *, vector_store=None, graph_store=None) -> dict[str, Any]:
     """Run the Data Analyst Agent to produce an AnalysisReport."""
+    vector_store = vector_store if vector_store is not None else _vector_store
+    graph_store = graph_store if graph_store is not None else _graph_store
+    if state.get("errors"):
+        return {}
     logger.info("[NODE] analyze_node")
 
-    assert _vector_store is not None
-    assert _graph_store is not None
+    assert vector_store is not None
+    assert graph_store is not None
 
-    tools = build_search_tools(_vector_store, _graph_store)
+    tools = build_search_tools(vector_store, graph_store)
 
     report = run_data_analyst(
         tools=tools,
@@ -124,19 +137,23 @@ def analyze_node(state: PipelineState) -> dict[str, Any]:
 
 # ── Node 5: Draft PRD ─────────────────────────────────────────────────────────
 
-def draft_prd_node(state: PipelineState) -> dict[str, Any]:
+def draft_prd_node(state: PipelineState, *, vector_store=None, graph_store=None) -> dict[str, Any]:
     """Run the PM Agent to produce a PRDDraft."""
+    vector_store = vector_store if vector_store is not None else _vector_store
+    graph_store = graph_store if graph_store is not None else _graph_store
+    if state.get("errors"):
+        return {}
     logger.info("[NODE] draft_prd_node")
 
-    assert _vector_store is not None
-    assert _graph_store is not None
+    assert vector_store is not None
+    assert graph_store is not None
 
     if not state.get("analysis_report"):
         return {
             "errors": state.get("errors", []) + ["draft_prd_node: missing analysis_report"]
         }
 
-    tools = build_search_tools(_vector_store, _graph_store)
+    tools = build_search_tools(vector_store, graph_store)
     cfg = get_settings()
 
     draft = run_pm_agent(
@@ -154,6 +171,8 @@ def draft_prd_node(state: PipelineState) -> dict[str, Any]:
 
 def review_prd_node(state: PipelineState) -> dict[str, Any]:
     """Run the Engineering Agent self-critique loop."""
+    if state.get("errors"):
+        return {}
     logger.info("[NODE] review_prd_node")
     cfg = get_settings()
 
@@ -181,12 +200,14 @@ def review_prd_node(state: PipelineState) -> dict[str, Any]:
 
 def output_node(state: PipelineState) -> dict[str, Any]:
     """Render and save the final PRD, roadmap, and priority matrix."""
+    if state.get("errors"):
+        return {}
     logger.info("[NODE] output_node")
 
     if not state.get("prd_draft"):
         return {"errors": state.get("errors", []) + ["output_node: no PRD to render"]}
 
-    generator = PRDGenerator()
+    generator = PRDGenerator(output_dir=state.get("output_dir"))
     paths = generator.generate_all(
         prd_draft=state["prd_draft"],
         analysis_report=state["analysis_report"],
@@ -217,7 +238,7 @@ def should_continue_critique(state: PipelineState) -> str:
     history = state.get("critique_history", [])
 
     if not history:
-        return "review_prd"
+        return "output"  # Missing drafts/errors must terminate, never loop forever.
 
     last = history[-1]
     if last["passed"]:
@@ -226,3 +247,4 @@ def should_continue_critique(state: PipelineState) -> str:
         return "output"
 
     return "output"  # Engineering Agent handles its own loop; always proceed
+
